@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"os"
 )
 
 type Parser struct {
@@ -52,7 +53,7 @@ func (p *Parser) visitTranslationUnit() bool {
 }
 
 func (p *Parser) visitExternalDeclaration(tunit *TranslationUnitAST) bool {
-	fmt.Println("visitExternalDeclaration")
+	debug("visitExternalDeclaration")
 	proto := p.visitFunctionDeclaration()
 
 	if proto != nil {
@@ -71,7 +72,7 @@ func (p *Parser) visitExternalDeclaration(tunit *TranslationUnitAST) bool {
 }
 
 func (p *Parser) visitFunctionDeclaration() (result *PrototypeAST) {
-	fmt.Println("visitFunctionDeclaration")
+	debug("visitFunctionDeclaration")
 
 	bkup := p.Tokens.getCurIndex()
 	proto := p.visitPrototype()
@@ -93,7 +94,7 @@ func (p *Parser) visitFunctionDeclaration() (result *PrototypeAST) {
 }
 
 func (p *Parser) visitFunctionDefinition() *FunctionAST {
-	fmt.Println("visitFunctionDefinition")
+	debug("visitFunctionDefinition")
 
 	proto := p.visitPrototype()
 
@@ -111,7 +112,7 @@ func (p *Parser) visitFunctionDefinition() *FunctionAST {
 }
 
 func (p *Parser) visitPrototype() *PrototypeAST {
-	fmt.Println("visitPrototype")
+	debug("visitPrototype")
 
 	var name string
 
@@ -174,7 +175,7 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 }
 
 func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *FunctionStmtAST) {
-	fmt.Println("visitFunctionStatement")
+	debug("visitFunctionStatement")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -220,7 +221,7 @@ func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *Function
 }
 
 func (p *Parser) visitVariableDeclaration() *VariableDeclAST {
-	fmt.Println("visitVariableDeclaration")
+	debug("visitVariableDeclaration")
 
 	var name string
 
@@ -252,7 +253,7 @@ func (p *Parser) visitVariableDeclaration() *VariableDeclAST {
 }
 
 func (p *Parser) visitStatement() (result AST) {
-	fmt.Println("visitStatement")
+	debug("visitStatement")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -273,7 +274,7 @@ func (p *Parser) visitStatement() (result AST) {
 }
 
 func (p *Parser) visitExpressionStatement() AST {
-	fmt.Println("visitExpressionStatement")
+	debug("visitExpressionStatement")
 
 	if p.Tokens.getCurString() == ";" {
 		p.Tokens.getNextToken()
@@ -289,7 +290,7 @@ func (p *Parser) visitExpressionStatement() AST {
 }
 
 func (p *Parser) visitAssignmentExpression() AST {
-	fmt.Println("visitAssignmentExpression")
+	debug("visitAssignmentExpression")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -320,7 +321,7 @@ func (p *Parser) visitAssignmentExpression() AST {
 }
 
 func (p *Parser) visitAdditiveExpression(lhs AST) AST {
-	fmt.Println("visitAdditiveExpression")
+	debug("visitAdditiveExpression")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -366,7 +367,7 @@ func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 }
 
 func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
-	fmt.Println("visitMultiplicativeExpression")
+	debug("visitMultiplicativeExpression")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -412,7 +413,7 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 }
 
 func (p *Parser) visitPostfixExpression() (result AST) {
-	fmt.Println("visitPostfixExpression")
+	debug("visitPostfixExpression")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -452,11 +453,18 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 		}
 	}
 
+	if result == nil {
+		if priExpr := p.visitPrimaryExpression(); priExpr != nil {
+			result = priExpr
+			return
+		}
+	}
+
 	return
 }
 
 func (p *Parser) visitPrimaryExpression() AST {
-	fmt.Println("visitPrimaryExpression")
+	debug("visitPrimaryExpression")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -485,7 +493,7 @@ func (p *Parser) visitPrimaryExpression() AST {
 }
 
 func (p *Parser) visitJumpStatement() AST {
-	fmt.Println("visitJumpStatement")
+	debug("visitJumpStatement")
 
 	bkup := p.Tokens.getCurIndex()
 
@@ -503,4 +511,10 @@ func (p *Parser) visitJumpStatement() AST {
 
 	p.Tokens.applyTokenIndex(bkup)
 	return nil
+}
+
+func debug(msg string) {
+	if os.Getenv("DEBUG") != "" {
+		fmt.Println(msg)
+	}
 }
