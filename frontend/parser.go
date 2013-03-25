@@ -417,11 +417,6 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 
 	bkup := p.Tokens.getCurIndex()
 
-	if priExpr := p.visitPrimaryExpression(); priExpr != nil {
-		result = priExpr
-		return
-	}
-
 	if p.Tokens.getCurType() == TOK_IDENTIFIER {
 		callee := p.Tokens.getCurString()
 		p.Tokens.getNextToken()
@@ -429,6 +424,11 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 		if p.Tokens.getCurType() != TOK_SYMBOL ||
 			p.Tokens.getCurString() != "(" {
 			p.Tokens.applyTokenIndex(bkup)
+
+			if priExpr := p.visitPrimaryExpression(); priExpr != nil {
+				result = priExpr
+			}
+
 			return
 		}
 
