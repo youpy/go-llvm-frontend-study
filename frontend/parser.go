@@ -6,14 +6,14 @@ import (
 )
 
 type Parser struct {
-	Tokens *TokenSet
-	TU     *TranslationUnitAST
+	*TokenSet
+	TU *TranslationUnitAST
 }
 
 func NewParser(filename string) *Parser {
 	tokens := LexicalAnalysis(filename)
 
-	return &Parser{Tokens: tokens}
+	return &Parser{TokenSet: tokens}
 }
 
 func (p *Parser) GetAST() (tu *TranslationUnitAST) {
@@ -27,7 +27,7 @@ func (p *Parser) GetAST() (tu *TranslationUnitAST) {
 }
 
 func (p *Parser) DoParse() (result bool) {
-	if p.Tokens != nil {
+	if p.TokenSet != nil {
 		result = p.visitTranslationUnit()
 	} else {
 		panic("error at lexer\n")
@@ -44,7 +44,7 @@ func (p *Parser) visitTranslationUnit() bool {
 			return false
 		}
 
-		if p.Tokens.getCurType() == TOK_EOF {
+		if p.getCurType() == TOK_EOF {
 			break
 		}
 	}
@@ -74,19 +74,19 @@ func (p *Parser) visitExternalDeclaration(tunit *TranslationUnitAST) bool {
 func (p *Parser) visitFunctionDeclaration() (result *PrototypeAST) {
 	debug("visitFunctionDeclaration")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 	proto := p.visitPrototype()
 
 	if proto == nil {
 		return nil
 	}
 
-	if p.Tokens.getCurString() == ";" {
-		p.Tokens.getNextToken()
+	if p.getCurString() == ";" {
+		p.getNextToken()
 
 		result = proto
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
@@ -116,58 +116,58 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 
 	var name string
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 	isFirstParam := true
 	paramList := []string{}
 
-	if p.Tokens.getCurType() == TOK_INT {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_INT {
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_IDENTIFIER {
-		name = p.Tokens.getCurString()
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_IDENTIFIER {
+		name = p.getCurString()
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL && p.Tokens.getCurString() == "(" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL && p.getCurString() == "(" {
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
 	for {
-		if p.Tokens.getCurType() == TOK_INT {
-			p.Tokens.getNextToken()
+		if p.getCurType() == TOK_INT {
+			p.getNextToken()
 		} else {
 			break
 		}
 
 		if !isFirstParam &&
-			p.Tokens.getCurType() == TOK_SYMBOL &&
-			p.Tokens.getCurString() == "," {
-			p.Tokens.getNextToken()
+			p.getCurType() == TOK_SYMBOL &&
+			p.getCurString() == "," {
+			p.getNextToken()
 		}
 
-		if p.Tokens.getCurType() == TOK_IDENTIFIER {
-			paramList = append(paramList, p.Tokens.getCurString())
-			p.Tokens.getNextToken()
+		if p.getCurType() == TOK_IDENTIFIER {
+			paramList = append(paramList, p.getCurString())
+			p.getNextToken()
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL && p.Tokens.getCurString() == ")" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL && p.getCurString() == ")" {
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
@@ -177,10 +177,10 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *FunctionStmtAST) {
 	debug("visitFunctionStatement")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurString() == "{" {
-		p.Tokens.getNextToken()
+	if p.getCurString() == "{" {
+		p.getNextToken()
 	} else {
 		return nil
 	}
@@ -209,11 +209,11 @@ func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *Function
 		}
 	}
 
-	if p.Tokens.getCurString() == "}" {
-		p.Tokens.getNextToken()
+	if p.getCurString() == "}" {
+		p.getNextToken()
 		return
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
@@ -225,27 +225,27 @@ func (p *Parser) visitVariableDeclaration() *VariableDeclAST {
 
 	var name string
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurType() == TOK_INT {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_INT {
+		p.getNextToken()
 	} else {
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_IDENTIFIER {
-		name = p.Tokens.getCurString()
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_IDENTIFIER {
+		name = p.getCurString()
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == ";" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == ";" {
+		p.getNextToken()
 	} else {
-		p.Tokens.applyTokenIndex(bkup)
+		p.applyTokenIndex(bkup)
 		return nil
 	}
 
@@ -255,7 +255,7 @@ func (p *Parser) visitVariableDeclaration() *VariableDeclAST {
 func (p *Parser) visitStatement() (result AST) {
 	debug("visitStatement")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
 	for {
 		if expr := p.visitExpressionStatement(); expr != nil {
@@ -265,7 +265,7 @@ func (p *Parser) visitStatement() (result AST) {
 			result = jump
 			return
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
@@ -276,12 +276,12 @@ func (p *Parser) visitStatement() (result AST) {
 func (p *Parser) visitExpressionStatement() AST {
 	debug("visitExpressionStatement")
 
-	if p.Tokens.getCurString() == ";" {
-		p.Tokens.getNextToken()
+	if p.getCurString() == ";" {
+		p.getNextToken()
 		return &NullExprAST{&BaseAST{NullExprID}}
 	} else if assignExpr := p.visitAssignmentExpression(); assignExpr != nil {
-		if p.Tokens.getCurString() == ";" {
-			p.Tokens.getNextToken()
+		if p.getCurString() == ";" {
+			p.getNextToken()
 			return assignExpr
 		}
 	}
@@ -292,22 +292,22 @@ func (p *Parser) visitExpressionStatement() AST {
 func (p *Parser) visitAssignmentExpression() AST {
 	debug("visitAssignmentExpression")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurType() == TOK_IDENTIFIER {
-		lhs := &VariableAST{p.Tokens.getCurString(), &BaseAST{VariableID}}
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_IDENTIFIER {
+		lhs := &VariableAST{p.getCurString(), &BaseAST{VariableID}}
+		p.getNextToken()
 
-		if p.Tokens.getCurType() == TOK_SYMBOL && p.Tokens.getCurString() == "=" {
-			p.Tokens.getNextToken()
+		if p.getCurType() == TOK_SYMBOL && p.getCurString() == "=" {
+			p.getNextToken()
 
 			if rhs := p.visitAdditiveExpression(nil); rhs != nil {
 				return &BinaryExprAST{"=", lhs, rhs, &BaseAST{BinaryExprID}}
 			} else {
-				p.Tokens.applyTokenIndex(bkup)
+				p.applyTokenIndex(bkup)
 			}
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 		}
 	}
 
@@ -323,7 +323,7 @@ func (p *Parser) visitAssignmentExpression() AST {
 func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 	debug("visitAdditiveExpression")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
 	if lhs == nil {
 		lhs = p.visitMultiplicativeExpression(nil)
@@ -333,9 +333,9 @@ func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == "+" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == "+" {
+		p.getNextToken()
 
 		rhs := p.visitMultiplicativeExpression(nil)
 
@@ -343,14 +343,14 @@ func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 			return p.visitMultiplicativeExpression(
 				&BinaryExprAST{"+", lhs, rhs, &BaseAST{BinaryExprID}})
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == "-" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == "-" {
+		p.getNextToken()
 
 		rhs := p.visitMultiplicativeExpression(nil)
 
@@ -358,7 +358,7 @@ func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 			return p.visitMultiplicativeExpression(
 				&BinaryExprAST{"-", lhs, rhs, &BaseAST{BinaryExprID}})
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
@@ -369,7 +369,7 @@ func (p *Parser) visitAdditiveExpression(lhs AST) AST {
 func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 	debug("visitMultiplicativeExpression")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
 	if lhs == nil {
 		lhs = p.visitPostfixExpression()
@@ -379,9 +379,9 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 		return nil
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == "*" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == "*" {
+		p.getNextToken()
 
 		rhs := p.visitPostfixExpression()
 
@@ -389,14 +389,14 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 			return p.visitMultiplicativeExpression(
 				&BinaryExprAST{"*", lhs, rhs, &BaseAST{BinaryExprID}})
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
 
-	if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == "/" {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == "/" {
+		p.getNextToken()
 
 		rhs := p.visitPostfixExpression()
 
@@ -404,7 +404,7 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 			return p.visitMultiplicativeExpression(
 				&BinaryExprAST{"/", lhs, rhs, &BaseAST{BinaryExprID}})
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
@@ -415,15 +415,15 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 func (p *Parser) visitPostfixExpression() (result AST) {
 	debug("visitPostfixExpression")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurType() == TOK_IDENTIFIER {
-		callee := p.Tokens.getCurString()
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_IDENTIFIER {
+		callee := p.getCurString()
+		p.getNextToken()
 
-		if p.Tokens.getCurType() != TOK_SYMBOL ||
-			p.Tokens.getCurString() != "(" {
-			p.Tokens.applyTokenIndex(bkup)
+		if p.getCurType() != TOK_SYMBOL ||
+			p.getCurString() != "(" {
+			p.applyTokenIndex(bkup)
 
 			if priExpr := p.visitPrimaryExpression(); priExpr != nil {
 				result = priExpr
@@ -432,24 +432,24 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 			return
 		}
 
-		p.Tokens.getNextToken()
+		p.getNextToken()
 
 		args := []AST{}
 
 		for assignExpr := p.visitAssignmentExpression(); assignExpr != nil; {
 			args = append(args, assignExpr)
-			if p.Tokens.getCurType() == TOK_SYMBOL && p.Tokens.getCurString() == "," {
-				p.Tokens.getNextToken()
+			if p.getCurType() == TOK_SYMBOL && p.getCurString() == "," {
+				p.getNextToken()
 			} else {
 				break
 			}
 		}
 
-		if p.Tokens.getCurType() == TOK_SYMBOL && p.Tokens.getCurString() == ")" {
-			p.Tokens.getNextToken()
+		if p.getCurType() == TOK_SYMBOL && p.getCurString() == ")" {
+			p.getNextToken()
 			result = &CallExprAST{callee, args, &BaseAST{CallExprID}}
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 		}
 	}
 
@@ -466,25 +466,25 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 func (p *Parser) visitPrimaryExpression() AST {
 	debug("visitPrimaryExpression")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurType() == TOK_IDENTIFIER {
-		name := p.Tokens.getCurString()
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_IDENTIFIER {
+		name := p.getCurString()
+		p.getNextToken()
 		return &VariableAST{name, &BaseAST{VariableID}}
-	} else if p.Tokens.getCurType() == TOK_DIGIT {
-		val := p.Tokens.getCurNumVal()
-		p.Tokens.getNextToken()
+	} else if p.getCurType() == TOK_DIGIT {
+		val := p.getCurNumVal()
+		p.getNextToken()
 		return &NumberAST{val, &BaseAST{NumberID}}
-	} else if p.Tokens.getCurType() == TOK_SYMBOL &&
-		p.Tokens.getCurString() == "-" {
-		p.Tokens.getNextToken()
-		if p.Tokens.getCurType() == TOK_DIGIT {
-			val := p.Tokens.getCurNumVal()
-			p.Tokens.getNextToken()
+	} else if p.getCurType() == TOK_SYMBOL &&
+		p.getCurString() == "-" {
+		p.getNextToken()
+		if p.getCurType() == TOK_DIGIT {
+			val := p.getCurNumVal()
+			p.getNextToken()
 			return &NumberAST{-val, &BaseAST{NumberID}}
 		} else {
-			p.Tokens.applyTokenIndex(bkup)
+			p.applyTokenIndex(bkup)
 			return nil
 		}
 	}
@@ -495,21 +495,21 @@ func (p *Parser) visitPrimaryExpression() AST {
 func (p *Parser) visitJumpStatement() AST {
 	debug("visitJumpStatement")
 
-	bkup := p.Tokens.getCurIndex()
+	bkup := p.getCurIndex()
 
-	if p.Tokens.getCurType() == TOK_RETURN {
-		p.Tokens.getNextToken()
+	if p.getCurType() == TOK_RETURN {
+		p.getNextToken()
 
 		if assignExpr := p.visitAssignmentExpression(); assignExpr != nil {
-			if p.Tokens.getCurType() == TOK_SYMBOL &&
-				p.Tokens.getCurString() == ";" {
-				p.Tokens.getNextToken()
+			if p.getCurType() == TOK_SYMBOL &&
+				p.getCurString() == ";" {
+				p.getNextToken()
 				return &JumpStmtAST{assignExpr, &BaseAST{JumpStmtID}}
 			}
 		}
 	}
 
-	p.Tokens.applyTokenIndex(bkup)
+	p.applyTokenIndex(bkup)
 	return nil
 }
 
