@@ -7,13 +7,20 @@ import (
 
 type Parser struct {
 	*TokenSet
-	TU *TranslationUnitAST
+	TU             *TranslationUnitAST
+	VariableTable  []string
+	PrototypeTable map[string]int
+	FunctionTable  map[string]int
 }
 
 func NewParser(filename string) *Parser {
 	tokens := LexicalAnalysis(filename)
 
-	return &Parser{TokenSet: tokens}
+	return &Parser{
+		TokenSet:       tokens,
+		VariableTable:  []string{},
+		PrototypeTable: make(map[string]int),
+		FunctionTable:  make(map[string]int)}
 }
 
 func (p *Parser) GetAST() (tu *TranslationUnitAST) {
@@ -82,8 +89,18 @@ func (p *Parser) visitFunctionDeclaration() (result *PrototypeAST) {
 	}
 
 	if p.getCurString() == ";" {
-		p.getNextToken()
+		_, isInPrototypeTable := p.PrototypeTable[proto.Name]
+		_, isInFunctionTable := p.FunctionTable[proto.Name]
 
+		if isInPrototypeTable ||
+			(isInFunctionTable && p.FunctionTable[proto.Name] != len(proto.Params)) {
+			fmt.Fprintf(os.Stderr, "Function: %s is redefined\n", proto.Name)
+			return nil
+		}
+
+		p.PrototypeTable[proto.Name] = len(proto.Params)
+
+		p.getNextToken()
 		result = proto
 	} else {
 		p.applyTokenIndex(bkup)
@@ -100,13 +117,26 @@ func (p *Parser) visitFunctionDefinition() *FunctionAST {
 
 	if proto == nil {
 		return nil
+	} else {
+		_, isInPrototypeTable := p.PrototypeTable[proto.Name]
+		_, isInFunctionTable := p.FunctionTable[proto.Name]
+
+		if (isInPrototypeTable && p.PrototypeTable[proto.Name] != len(proto.Params)) ||
+			isInFunctionTable {
+			fmt.Fprintf(os.Stderr, "Function: %s is redefined\n", proto.Name)
+			return nil
+		}
 	}
+
+	p.VariableTable = []string{}
 
 	funcStmt := p.visitFunctionStatement(proto)
 
 	if funcStmt == nil {
 		return nil
 	}
+
+	p.FunctionTable[proto.Name] = len(proto.Params)
 
 	return &FunctionAST{proto, funcStmt}
 }
@@ -156,6 +186,13 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 		}
 
 		if p.getCurType() == TOK_IDENTIFIER {
+			for _, param := range paramList {
+				if param == p.getCurString() {
+					p.applyTokenIndex(bkup)
+					return nil
+				}
+			}
+
 			paramList = append(paramList, p.getCurString())
 			p.getNextToken()
 		} else {
@@ -189,12 +226,21 @@ func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *Function
 
 	for i, _ := range proto.Params {
 		vdecl := &VariableDeclAST{proto.Params[i], Decl_param, &BaseAST{VariableDeclID}}
+		p.VariableTable = append(p.VariableTable, vdecl.Name)
 		funcStmt.VariableDecls = append(funcStmt.VariableDecls, vdecl)
 	}
 
 	for {
 		if vdecl := p.visitVariableDeclaration(); vdecl != nil {
 			vdecl.Type = Decl_local
+
+			for _, availableVdecl := range p.VariableTable {
+				if availableVdecl == vdecl.Name {
+					return nil
+				}
+			}
+
+			p.VariableTable = append(p.VariableTable, vdecl.Name)
 			funcStmt.VariableDecls = append(funcStmt.VariableDecls, vdecl)
 		} else {
 			break
@@ -206,6 +252,15 @@ func (p *Parser) visitFunctionStatement(proto *PrototypeAST) (funcStmt *Function
 			funcStmt.StmtLists = append(funcStmt.StmtLists, stmt)
 		} else {
 			break
+		}
+	}
+
+	if len(funcStmt.StmtLists) > 0 {
+		lastStmt := funcStmt.StmtLists[len(funcStmt.StmtLists)-1]
+
+		if lastStmt.GetID() != JumpStmtID {
+			p.applyTokenIndex(bkup)
+			return nil
 		}
 	}
 
@@ -295,14 +350,26 @@ func (p *Parser) visitAssignmentExpression() AST {
 	bkup := p.getCurIndex()
 
 	if p.getCurType() == TOK_IDENTIFIER {
-		lhs := &VariableAST{p.getCurString(), &BaseAST{VariableID}}
-		p.getNextToken()
+		found := false
 
-		if p.getCurType() == TOK_SYMBOL && p.getCurString() == "=" {
+		for _, availableVdecl := range p.VariableTable {
+			if availableVdecl == p.getCurString() {
+				found = true
+			}
+		}
+
+		if found {
+			lhs := &VariableAST{p.getCurString(), &BaseAST{VariableID}}
 			p.getNextToken()
 
-			if rhs := p.visitAdditiveExpression(nil); rhs != nil {
-				return &BinaryExprAST{"=", lhs, rhs, &BaseAST{BinaryExprID}}
+			if p.getCurType() == TOK_SYMBOL && p.getCurString() == "=" {
+				p.getNextToken()
+
+				if rhs := p.visitAdditiveExpression(nil); rhs != nil {
+					return &BinaryExprAST{"=", lhs, rhs, &BaseAST{BinaryExprID}}
+				} else {
+					p.applyTokenIndex(bkup)
+				}
 			} else {
 				p.applyTokenIndex(bkup)
 			}
@@ -415,11 +482,26 @@ func (p *Parser) visitMultiplicativeExpression(lhs AST) AST {
 func (p *Parser) visitPostfixExpression() (result AST) {
 	debug("visitPostfixExpression")
 
+	var paramNum int
+	var isInTable bool
+
 	bkup := p.getCurIndex()
 
 	if p.getCurType() == TOK_IDENTIFIER {
 		callee := p.getCurString()
 		p.getNextToken()
+
+		if paramNum, isInTable = p.PrototypeTable[callee]; !isInTable {
+			if paramNum, isInTable = p.FunctionTable[callee]; !isInTable {
+				p.applyTokenIndex(bkup)
+
+				if priExpr := p.visitPrimaryExpression(); priExpr != nil {
+					result = priExpr
+				}
+
+				return
+			}
+		}
 
 		if p.getCurType() != TOK_SYMBOL ||
 			p.getCurString() != "(" {
@@ -443,6 +525,11 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 			} else {
 				break
 			}
+		}
+
+		if len(args) != paramNum {
+			p.applyTokenIndex(bkup)
+			return nil
 		}
 
 		if p.getCurType() == TOK_SYMBOL && p.getCurString() == ")" {
@@ -469,9 +556,22 @@ func (p *Parser) visitPrimaryExpression() AST {
 	bkup := p.getCurIndex()
 
 	if p.getCurType() == TOK_IDENTIFIER {
-		name := p.getCurString()
-		p.getNextToken()
-		return &VariableAST{name, &BaseAST{VariableID}}
+		found := false
+
+		for _, availableVdecl := range p.VariableTable {
+			if availableVdecl == p.getCurString() {
+				found = true
+			}
+		}
+
+		if found {
+			name := p.getCurString()
+			p.getNextToken()
+			return &VariableAST{name, &BaseAST{VariableID}}
+		} else {
+			p.applyTokenIndex(bkup)
+			return nil
+		}
 	} else if p.getCurType() == TOK_DIGIT {
 		val := p.getCurNumVal()
 		p.getNextToken()
