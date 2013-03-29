@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"llvm_study/frontend"
 	"os"
 )
@@ -14,5 +13,5 @@ func main() {
 	parser.DoParse()
 	ast := parser.GetAST()
 
-	fmt.Println(json.NewEncoder(os.Stdout).Encode(ast))
+	json.NewEncoder(os.Stdout).Encode(ast)
 }
