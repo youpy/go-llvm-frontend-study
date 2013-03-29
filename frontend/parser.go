@@ -178,16 +178,16 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 	}
 
 	for {
-		if p.getCurType() == TOK_INT {
-			p.getNextToken()
-		} else {
-			break
-		}
-
 		if !isFirstParam &&
 			p.getCurType() == TOK_SYMBOL &&
 			p.getCurString() == "," {
 			p.getNextToken()
+		}
+
+		if p.getCurType() == TOK_INT {
+			p.getNextToken()
+		} else {
+			break
 		}
 
 		if p.getCurType() == TOK_IDENTIFIER {
@@ -198,6 +198,7 @@ func (p *Parser) visitPrototype() *PrototypeAST {
 				}
 			}
 
+			isFirstParam = false
 			paramList = append(paramList, p.getCurString())
 			p.getNextToken()
 		} else {
@@ -523,12 +524,15 @@ func (p *Parser) visitPostfixExpression() (result AST) {
 
 		args := []AST{}
 
-		for assignExpr := p.visitAssignmentExpression(); assignExpr != nil; {
-			args = append(args, assignExpr)
-			if p.getCurType() == TOK_SYMBOL && p.getCurString() == "," {
-				p.getNextToken()
-			} else {
-				break
+		for {
+			if assignExpr := p.visitAssignmentExpression(); assignExpr != nil {
+				args = append(args, assignExpr)
+
+				if p.getCurType() == TOK_SYMBOL && p.getCurString() == "," {
+					p.getNextToken()
+				} else {
+					break
+				}
 			}
 		}
 
