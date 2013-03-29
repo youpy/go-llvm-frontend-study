@@ -8,6 +8,6 @@ link_test.ll: printnum.ll test.ll
 printnum.ll: printnum.c
 	clang -emit-llvm -S -O -o printnum.ll printnum.c
 test.ll: test.xxx
-	go run code_gen.go test.xxx 2> test.ll
+	go run code_gen.go test.xxx test.ll
 clean:
 	rm -f *.ll *.s link_test

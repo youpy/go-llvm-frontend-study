@@ -7,16 +7,17 @@ import (
 )
 
 func main() {
-	filename := os.Args[1]
+	infile := os.Args[1]
+	outfile := os.Args[2]
 
-	parser := frontend.NewParser(filename)
+	parser := frontend.NewParser(infile)
 	parser.DoParse()
 	ast := parser.GetAST()
 
 	llvm.InitializeNativeTarget()
 
 	codeGen := frontend.NewCodeGen(llvm.GlobalContext())
-	codeGen.DoCodeGen(ast, filename)
+	codeGen.DoCodeGen(ast, infile)
 	mod := codeGen.GetModule()
 
 	pass := llvm.NewPassManager()
@@ -25,5 +26,9 @@ func main() {
 	pass.AddPromoteMemoryToRegisterPass()
 	pass.Run(mod)
 
-	mod.Dump()
+	err := mod.PrintToFile(outfile)
+
+	if err != nil {
+		panic(err)
+	}
 }
