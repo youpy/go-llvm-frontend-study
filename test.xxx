@@ -1,6 +1,6 @@
-int test(int j){
+int test(int j, int k){
     int i;
-    i=j*10;
+    i=j*10+k;
     return i;
 }
 
@@ -9,6 +9,6 @@ int test(int j){
 int main (){
     int i;
     i=10;
-    printnum(test(i));
+    printnum(test(i, 2));
     return 0;
 }
