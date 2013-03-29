@@ -46,6 +46,11 @@ func (p *Parser) DoParse() (result bool) {
 func (p *Parser) visitTranslationUnit() bool {
 	p.TU = &TranslationUnitAST{[]*PrototypeAST{}, []*FunctionAST{}}
 
+	// printnum
+	paramList := []string{"i"}
+	p.TU.Prototypes = append(p.TU.Prototypes, &PrototypeAST{"printnum", paramList})
+	p.PrototypeTable["printnum"] = 1
+
 	for {
 		if !p.visitExternalDeclaration(p.TU) {
 			return false
