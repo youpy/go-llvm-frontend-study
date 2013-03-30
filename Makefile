@@ -7,7 +7,10 @@ link_test.ll: printnum.ll test.ll
 	llvm-link printnum.ll test.ll -S -o link_test.ll
 printnum.ll: printnum.c
 	clang -emit-llvm -S -O -o $@ $<
-test.ll: test.xxx
-	go run code_gen.go $< $@
+test.ll: test.xxx code_gen
+	./code_gen $< $@
+code_gen: code_gen.go
+	go build code_gen.go
 clean:
-	rm -f *.ll *.s link_test
+	rm -f *.ll *.s link_test code_gen
+
