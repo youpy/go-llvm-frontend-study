@@ -1,145 +1,151 @@
+// based on http://cuddle.googlecode.com/hg/talk/lex.html
 package frontend
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"io"
-	"os"
+	"io/ioutil"
 	"strings"
+	"unicode/utf8"
 )
 
-func compare(char byte, str string) bool {
-	return bytes.IndexAny([]byte{char}, str) == 0
+type Lexer struct {
+	input   string
+	start   int
+	pos     int
+	width   int
+	lineNum int
+	tokens  *TokenSet
 }
 
-func byte2string(char byte) string {
-	return string([]byte{char})
+type StateFn func(*Lexer) StateFn
+
+const (
+	leftComment  string = "/*"
+	rightComment string = "*/"
+	idInt        string = "int"
+	idReturn     string = "return"
+	eof          rune   = rune(0)
+)
+
+func NewLexer(input string) *Lexer {
+	return &Lexer{input: input, tokens: NewTokenSet()}
+}
+
+func (l *Lexer) next() (r rune) {
+	if l.pos >= len(l.input) {
+		l.width = 0
+		return eof
+	}
+
+	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
+	l.pos += l.width
+
+	return r
+}
+
+func (l *Lexer) emit(t TokenType) {
+	l.tokens.Tokens = append(l.tokens.Tokens, NewToken(l.input[l.start:l.pos], t, l.lineNum))
+	l.start = l.pos
+}
+
+func (l *Lexer) accept(str string) bool {
+	if strings.IndexRune(str, l.next()) >= 0 {
+		return true
+	}
+
+	l.backup()
+	return false
+}
+
+func (l *Lexer) acceptRun(str string) {
+	for strings.IndexRune(str, l.next()) >= 0 {
+	}
+	l.backup()
+}
+
+func (l *Lexer) acceptPrefix(prefix string) bool {
+	if strings.HasPrefix(l.input[l.pos:], prefix) {
+		l.pos += len(prefix)
+		return true
+	}
+
+	return false
+}
+
+func (l *Lexer) backup() {
+	l.pos -= l.width
+}
+
+func (l *Lexer) ignore() {
+	l.start = l.pos
+}
+
+func (l *Lexer) run() {
+	for state := lexCode; state != nil; {
+		state = state(l)
+	}
+}
+
+func lexCode(l *Lexer) StateFn {
+	for {
+		if l.acceptPrefix(leftComment) {
+			return lexComment
+		}
+
+		if l.acceptPrefix(idInt) {
+			l.emit(TOK_INT)
+		} else if l.acceptPrefix(idReturn) {
+			l.emit(TOK_RETURN)
+		} else if l.accept("abcdefghijklnmopqrstuvwxyz") {
+			l.acceptRun("abcdefghijklnmopqrstuvwxyz0123456789")
+			l.emit(TOK_IDENTIFIER)
+		} else if l.accept("\n") {
+			l.lineNum += 1
+			l.ignore()
+		} else if l.accept("0123456789") {
+			l.acceptRun("0123456789")
+			l.emit(TOK_DIGIT)
+		} else if l.accept("*+-=;,(){}") {
+			l.emit(TOK_SYMBOL)
+		} else {
+			l.next()
+			l.ignore()
+		}
+
+		if l.next() == eof {
+			l.emit(TOK_EOF)
+			break
+		} else {
+			l.backup()
+		}
+	}
+
+	return nil
+}
+
+func lexComment(l *Lexer) StateFn {
+	for {
+		if l.acceptPrefix(rightComment) {
+			l.ignore()
+			return lexCode
+		}
+
+		if l.next() == eof {
+			break
+		}
+	}
+
+	return nil
 }
 
 func LexicalAnalysis(filename string) *TokenSet {
-	var next_token *Token
-
-	tokens := NewTokenSet()
-	line_num := 0
-	isComment := false
-
-	file, err := os.Open(filename)
+	input, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		panic(err)
 	}
 
-	defer func() {
-		if file.Close() != nil {
-			panic(err)
-		}
-	}()
+	lexer := NewLexer(string(input))
+	lexer.run()
 
-	r := bufio.NewReader(file)
-
-	for {
-		buf, _, err := r.ReadLine()
-
-		if err != nil && err != io.EOF {
-			panic(err)
-		}
-		if buf == nil {
-			break
-		}
-
-		index := 0
-		length := len(buf)
-		token_str := ""
-
-		for index < length {
-			next_char := byte2string(buf[index])
-			index++
-
-			if isComment {
-				if (length-index) < 2 || !compare(buf[index], "*") || !compare(buf[index+1], "/") {
-					continue
-				} else {
-					index += 2
-					isComment = false
-				}
-			}
-
-			if err == io.EOF {
-				token_str := "EOF"
-				next_token = NewToken(token_str, TOK_EOF, line_num)
-			} else if strings.Contains(" \t\r\n", next_char) {
-				continue
-			} else if strings.Contains("abcdefghijklnmopqrstuvwxyz", strings.ToLower(next_char)) {
-				token_str += next_char
-				next_char = byte2string(buf[index])
-				index++
-
-				for strings.Contains("abcdefghijklnmopqrstuvwxyz0987654321", strings.ToLower(next_char)) {
-					token_str += next_char
-					next_char = byte2string(buf[index])
-					index++
-
-					if index == length {
-						break
-					}
-				}
-
-				index--
-
-				if token_str == "int" {
-					next_token = NewToken(token_str, TOK_INT, line_num)
-				} else if token_str == "return" {
-					next_token = NewToken(token_str, TOK_RETURN, line_num)
-				} else {
-					next_token = NewToken(token_str, TOK_IDENTIFIER, line_num)
-				}
-			} else if strings.Contains("0987654321", next_char) {
-				if next_char == "0" {
-					token_str += next_char
-					next_token = NewToken(token_str, TOK_DIGIT, line_num)
-				} else {
-					token_str += next_char
-					next_char = byte2string(buf[index])
-					index++
-
-					for strings.Contains("0987654321", next_char) {
-						token_str += next_char
-						next_char = byte2string(buf[index])
-						index++
-					}
-
-					next_token = NewToken(token_str, TOK_DIGIT, line_num)
-					index--
-				}
-			} else if next_char == "/" {
-				token_str += next_char
-				next_char = byte2string(buf[index])
-				index++
-
-				if next_char == "/" {
-					break
-				} else if next_char == "*" {
-					isComment = true
-					continue
-				} else {
-					index--
-					next_token = NewToken(token_str, TOK_SYMBOL, line_num)
-				}
-			} else if strings.Contains("*+-=;,(){}", next_char) {
-				token_str += next_char
-				next_token = NewToken(token_str, TOK_SYMBOL, line_num)
-			} else {
-				fmt.Fprintf(os.Stderr, "unclear token : %s\n", next_char)
-				return nil
-			}
-
-			tokens.Tokens = append(tokens.Tokens, next_token)
-			token_str = ""
-		}
-
-		line_num++
-	}
-
-	return tokens
+	return lexer.tokens
 }
