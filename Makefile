@@ -1,3 +1,11 @@
+# # https://github.com/axw/gollvm
+# export CGO_LDFLAGS="`llvm-config --ldflags` -Wl,-L`llvm-config --libdir` -lLLVM-`llvm-config --version`"
+# export CGO_CFLAGS="`llvm-config --cflags`"
+#
+# # https://github.com/mxcl/homebrew/issues/23119
+# export CXX=clang++
+# export CC=clang
+
 link_test: link_test.s
 	gcc -o $@ $<
 link_test.s: link_test.ll
